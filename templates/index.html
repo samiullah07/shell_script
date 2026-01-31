@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>📝 My Todo List</h1>
+        
+        <div class="input-section">
+            <input type="text" id="todoInput" placeholder="Add a new task...">
+            <button onclick="addTodo()">Add</button>
+        </div>
+
+        <div class="filter-section">
+            <button class="filter-btn active" onclick="filterTodos('all')">All</button>
+            <button class="filter-btn" onclick="filterTodos('active')">Active</button>
+            <button class="filter-btn" onclick="filterTodos('completed')">Completed</button>
+        </div>
+
+        <ul id="todoList"></ul>
+    </div>
+
+    <script>
+        let currentFilter = 'all';
+
+        async function loadTodos() {
+            const response = await fetch('/api/todos');
+            const todos = await response.json();
+            renderTodos(todos);
+        }
+
+        function renderTodos(todos) {
+            const filteredTodos = todos.filter(todo => {
+                if (currentFilter === 'all') return true;
+                if (currentFilter === 'active') return !todo.completed;
+                if (currentFilter === 'completed') return todo.completed;
+            });
+
+            const todoList = document.getElementById('todoList');
+            todoList.innerHTML = '';
+
+            filteredTodos.forEach(todo => {
+                const li = document.createElement('li');
+                li.className = todo.completed ? 'completed' : '';
+                li.innerHTML = `
+                    <input type="checkbox" ${todo.completed ? 'checked' : ''} 
+                           onchange="toggleTodo(${todo.id})">
+                    <span>${todo.text}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">Delete</button>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        async function addTodo() {
+            const input = document.getElementById('todoInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+
+            await fetch('/api/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            input.value = '';
+            loadTodos();
+        }
+
+        async function toggleTodo(id) {
+            const response = await fetch('/api/todos');
+            const todos = await response.json();
+            const todo = todos.find(t => t.id === id);
+
+            await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: !todo.completed })
+            });
+
+            loadTodos();
+        }
+
+        async function deleteTodo(id) {
+            await fetch(`/api/todos/${id}`, {
+                method: 'DELETE'
+            });
+            loadTodos();
+        }
+
+        function filterTodos(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            loadTodos();
+        }
+
+        document.getElementById('todoInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTodo();
+        });
+
+        loadTodos();
+    </script>
+</body>
+</html>
